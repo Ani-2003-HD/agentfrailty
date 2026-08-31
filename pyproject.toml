@@ -1,0 +1,36 @@
+[project]
+name = "agentfrailty"
+version = "0.1.0"
+description = "Are agent failures independent? Separating task frailty from within-run dependence in local LLM agents."
+# Upper bound is deliberate, same reason as quantcost: mlx-lm and
+# llama-cpp-python do not ship wheels for 3.14 yet.
+requires-python = ">=3.10,<3.14"
+dependencies = ["pyyaml>=6.0", "requests>=2.31"]
+
+[project.optional-dependencies]
+mlx = ["mlx-lm>=0.20"]
+llamacpp = ["llama-cpp-python>=0.3"]
+# lifelines carries the Weibull AFT / frailty machinery; statsmodels the
+# beta-binomial and dispersion tests.
+analysis = [
+    "pandas>=2.0",
+    "matplotlib>=3.8",
+    "scipy>=1.11",
+    "statsmodels>=0.14",
+    "lifelines>=0.29",
+]
+
+[project.scripts]
+agentfrailty = "agentfrailty.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = [
+    "agentfrailty",
+    "agentfrailty.envs",
+    "agentfrailty.scorers",
+    "agentfrailty.runtimes",
+]

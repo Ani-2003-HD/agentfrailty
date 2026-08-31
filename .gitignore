@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.DS_Store
+
+# Model weights -- large and always re-downloadable.
+*.gguf
+
+# Results ARE the contribution and are committed -- but only the gzipped raw
+# episodes plus the summary. Everything else here is DERIVED from
+# episodes.jsonl.gz, so shipping it would put duplicate data in front of
+# anyone cloning the repo.
+results/*.tmp
+results/episodes.jsonl
+results/killtest_*.jsonl
+
+# Personal distribution drafts -- not for publication
+docs/posts.md
