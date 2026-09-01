@@ -100,6 +100,33 @@ class ModelSpec:
 
 
 @dataclass
+class GenResult:
+    """
+    Raw output of ONE model call. No scoring, no judgement.
+
+    This is the runtime layer's return type, carried over unchanged from
+    quantcost so the adapters work here untouched. In this project it is an
+    intermediate: the runner turns each GenResult into a StepRecord and it is
+    the StepRecord that gets persisted.
+    """
+
+    text: str = ""
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    ttft_s: Optional[float] = None
+    total_s: float = 0.0
+    error: str = ""
+
+    @property
+    def decode_tps(self) -> Optional[float]:
+        """Tokens/sec excluding prefill. None when unmeasurable."""
+        if self.ttft_s is None or self.completion_tokens <= 1:
+            return None
+        decode_s = self.total_s - self.ttft_s
+        return self.completion_tokens / decode_s if decode_s > 0 else None
+
+
+@dataclass
 class StepRecord:
     """
     One model call inside an episode. Raw only -- no judgement.
