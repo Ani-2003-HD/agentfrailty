@@ -32,7 +32,17 @@ DESIGN, and the discipline in it:
   * A random arm drawn from the full WORDS list is the control.
   * Graph and values are held fixed throughout, as in the sweep.
 
-    python3 scripts/vocab.py --draws 10 --repeats 10
+    python3 scripts/vocab.py --draws 30 --repeats 10
+
+STATUS: INCONCLUSIVE, and excluded from the published findings.
+
+At 10 draws per arm this is badly underpowered: per-draw rates are bimodal at 0
+and 1, so an arm mean is dominated by which six words were drawn. Combined with
+the seeding bug above, two runs of the identical command produced opposite
+readings. The lexical effect itself is established by scripts/wordsweep.py --
+40 word sets, reproducible, ICC 0.717 -- and does not depend on this script.
+Kept in the repo because a negative-and-underpowered result is worth being able
+to re-run; needs >=30 draws per arm to say anything.
 """
 
 from __future__ import annotations
@@ -100,9 +110,16 @@ def main():
                      n_distractors=len(FIXED_DISTRACTORS))
 
     arms = {"abstract": ABSTRACT, "concrete": CONCRETE, "random": WORDS}
+    # Fixed integer seeds. The first version used `hash(arm) % 10000`, and
+    # Python randomises str hashing per process unless PYTHONHASHSEED is set --
+    # so the word draws were a fresh lottery on every invocation and the
+    # experiment was never reproducible. Two runs gave contradictory answers
+    # (abstract 0.34 then 0.77) before the bug was found, which is exactly what
+    # irreproducible sampling looks like from the outside.
+    ARM_SEEDS = {"abstract": 101, "concrete": 202, "random": 303}
     jobs = []
     for arm, pool in arms.items():
-        rng = random.Random(hash(arm) % 10000)
+        rng = random.Random(ARM_SEEDS[arm])
         for d in range(a.draws):
             path = rng.sample([w for w in pool if w not in FIXED_DISTRACTORS],
                               a.n)

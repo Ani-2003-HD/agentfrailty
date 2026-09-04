@@ -19,3 +19,4 @@ results/killtest_*.jsonl
 # Personal distribution drafts -- not for publication
 docs/posts.md
 docs/papers/
+results_dirty/
