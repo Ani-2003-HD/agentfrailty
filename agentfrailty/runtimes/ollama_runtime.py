@@ -82,15 +82,25 @@ class OllamaRuntime(Runtime):
     ) -> GenResult:
         import requests
 
+        options = {
+            "temperature": temperature,
+            "seed": seed,
+            "num_predict": max_tokens,
+        }
+        # DIVERGES FROM quantcost's copy of this adapter, deliberately.
+        # In an agent loop the transcript is plain text, and a small model will
+        # happily keep writing past its own turn -- inventing "Tool result:"
+        # lines and continuing the conversation. Those fabrications then get fed
+        # back as context. Stop sequences end the turn at the boundary.
+        stop = self.kw.get("stop")
+        if stop:
+            options["stop"] = list(stop)
+
         payload = {
             "model": self.model_path,
             "prompt": prompt,
             "stream": True,
-            "options": {
-                "temperature": temperature,
-                "seed": seed,
-                "num_predict": max_tokens,
-            },
+            "options": options,
         }
         t = _Timer()
         chunks: list[str] = []

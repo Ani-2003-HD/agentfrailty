@@ -45,6 +45,10 @@ from .envs.ledger import LedgerEnv, LedgerTask
 from .parsing import parse_tool_call, render_tools
 from .schema import EpisodeRow, ModelSpec, StepRecord
 
+# The transcript delimiters. The loop owns them, so it also owns the stop
+# sequences that keep a model inside its own turn.
+STOP_SEQUENCES = ["Tool result:", "\nAssistant:", "\nUser:", "\nTask:"]
+
 SYSTEM_TEMPLATE = """You are an agent that completes a task by calling tools.
 
 Available tools:
@@ -197,6 +201,8 @@ def run_episode(
             rec.parse_ok = True
             rec.tool_name = parsed.name
             rec.tool_args = parsed.args
+            rec.repaired = parsed.repaired
+            rec.repairs = list(parsed.repairs)
         else:
             rec.parse_ok = False
             rec.parse_error = parsed.error if parsed else "no_generation"
@@ -216,8 +222,20 @@ def run_episode(
             rec.error = f"retries={retries}"
 
         steps.append(rec)
+        # Append the PARSED SPAN, not the raw text.
+        #
+        # A small model often keeps writing past its own turn, fabricating
+        # "Tool result:" lines and continuing the conversation. Feeding that
+        # back would put invented observations into context, and every value the
+        # model later "read" would be its own hallucination. Stop sequences
+        # prevent most of it; this makes it structurally impossible.
+        #
+        # rec.raw_output still holds the full text, so nothing is lost for
+        # auditing -- only the context is cleaned.
+        assistant_text = parsed.span if (parsed and parsed.ok and parsed.span) \
+            else (gen.text or "")
         turns.append(Turn(
-            assistant=gen.text,
+            assistant=assistant_text,
             observation=format_observation(result.payload),
         ))
 

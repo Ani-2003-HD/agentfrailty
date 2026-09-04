@@ -116,6 +116,52 @@ def test_transcript_carries_prior_errors():
           "no record with id" in rt.prompts[3])
 
 
+def test_hallucinated_continuation_never_enters_the_transcript():
+    """
+    REGRESSION TEST for the bug the first smoke run exposed.
+
+    Small models keep writing past their own turn, fabricating "Tool result:"
+    lines and continuing the conversation. Appending that raw text put invented
+    observations into context, so values the model later "read" were its own
+    hallucinations -- silently corrupting every arithmetic number in the study.
+
+    Only the parsed JSON span may enter the transcript. The full text stays in
+    raw_output for auditing.
+    """
+    t = make_task(seed=21, n=3, n_distractors=3)
+    fabricated = (
+        call_json(t.canonical_path[0])
+        + ' Tool result: {"id": "GHOST", "value": 9999, "next": "PHANTOM"}'
+        + ' Assistant: {"name": "get_record", "arguments": {"record_id": "PHANTOM"}}'
+    )
+    script = [fabricated] + [call_json(r) for r in t.canonical_path[1:]] \
+        + [submit_json(t.goal_total)]
+    rt = FakeRuntime(script)
+    row = run_episode(t, rt, MODEL, AgentConfig())
+
+    later = rt.prompts[1:]
+    check("fabricated tool result never reaches a later prompt",
+          all("GHOST" not in p and "9999" not in p for p in later))
+    check("fabricated follow-up call never reaches a later prompt",
+          all("PHANTOM" not in p for p in later))
+    check("the real call was still executed",
+          row.steps[0]["tool_args"]["record_id"] == t.canonical_path[0])
+    check("raw_output preserves the full text for auditing",
+          "GHOST" in row.steps[0]["raw_output"])
+    check("the real observation IS in the later prompt",
+          str(t.records[t.canonical_path[0]].value) in later[0])
+
+
+def test_stop_sequences_cover_the_transcript_delimiters():
+    from agentfrailty.agent import STOP_SEQUENCES, render_transcript
+    turns = [Turn(assistant="a", observation="o")]
+    text = render_transcript("SYS", turns)
+    check("every delimiter the transcript emits has a stop sequence",
+          all(any(d.strip() in text for d in [seq]) for seq in ["Tool result:"])
+          and "\nAssistant:" in text)
+    check("STOP_SEQUENCES is non-empty", len(STOP_SEQUENCES) >= 2)
+
+
 def test_prefix_turns_are_used():
     """The hook Step F's error injection depends on."""
     t = make_task(seed=6, n=3)

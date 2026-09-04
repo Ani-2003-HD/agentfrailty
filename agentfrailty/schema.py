@@ -60,6 +60,31 @@ def _chip() -> str:
         return ""
 
 
+def code_version() -> dict:
+    """
+    Which version of this code produced a row.
+
+    Added after the first smoke runs: results.jsonl is append-only, so three
+    runs from three versions of the parser landed in one file and the summary
+    silently averaged over data we already knew was corrupt. Provenance in the
+    row makes that impossible to do by accident -- filter on commit, and a
+    dirty tree is visible rather than assumed away.
+    """
+    def _git(*args):
+        try:
+            return subprocess.run(
+                ["git", *args],
+                capture_output=True, text=True, check=False,
+                cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            ).stdout.strip()
+        except Exception:
+            return ""
+
+    commit = _git("rev-parse", "HEAD")
+    dirty = bool(_git("status", "--porcelain"))
+    return {"commit": commit, "dirty": dirty, "schema_version": SCHEMA_VERSION}
+
+
 @dataclass
 class HostInfo:
     """Captured once per session, pinned into every row for reproducibility."""
@@ -145,6 +170,12 @@ class StepRecord:
     tool_name: Optional[str] = None
     tool_args: Optional[dict] = None
     parse_error: str = ""
+    # An arithmetic expression was evaluated to a literal to make the call
+    # parse, e.g. {"total": 67 - 2 - 46} -> {"total": 19}. Recorded rather than
+    # hidden: strict and lenient accuracy are different numbers, and which one
+    # to report is an analysis decision, not a runner decision.
+    repaired: bool = False
+    repairs: list = field(default_factory=list)
 
     # environment outcome -- what the world actually did in response
     env_ok: bool = False
@@ -201,8 +232,9 @@ class EpisodeRow:
     health: dict = field(default_factory=dict)
     timings_clean: bool = True
 
-    # environment
+    # environment and provenance
     host: dict = field(default_factory=dict)
+    code: dict = field(default_factory=code_version)
     mem_before: dict = field(default_factory=dict)
     mem_after: dict = field(default_factory=dict)
 

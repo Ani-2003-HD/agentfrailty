@@ -61,6 +61,46 @@ def test_nested_braces():
     check("nested braces", p.ok and isinstance(p.args["body"], dict))
 
 
+# -- arithmetic expressions where a number belongs --------------------------
+# Found in the very first smoke run: qwen2.5-1.5b emitted
+#   {"name": "submit", "arguments": {"total": 67 - 2 - 46}}
+# 67-2-46 is 19, which was the correct answer. Rejecting it would score a
+# formatting slip as an arithmetic failure.
+
+def test_arithmetic_expression_is_repaired():
+    p = parse_tool_call('{"name": "submit", "arguments": {"total": 67 - 2 - 46}}')
+    check("expression evaluated", p.ok and p.args["total"] == 19)
+    check("repair is flagged", p.repaired)
+    check("repair is recorded for audit", p.repairs == [("67 - 2 - 46", 19)])
+
+
+def test_parenthesised_expression():
+    p = parse_tool_call('{"name": "submit", "arguments": {"total": (67 - 2) - 46}}')
+    check("parenthesised expression evaluated", p.ok and p.args["total"] == 19)
+
+
+def test_plain_literal_is_not_marked_repaired():
+    p = parse_tool_call('{"name": "submit", "arguments": {"total": 19}}')
+    check("literal parses without repair", p.ok and not p.repaired)
+
+
+def test_negative_literal_is_not_repaired():
+    p = parse_tool_call('{"name": "submit", "arguments": {"total": -5}}')
+    check("negative literal untouched", p.ok and p.args["total"] == -5
+          and not p.repaired)
+
+
+def test_repair_never_executes_code():
+    """The repair pass evaluates arithmetic only -- never names or calls."""
+    hostile = [
+        '{"name": "submit", "arguments": {"total": __import__("os").system("x")}}',
+        '{"name": "submit", "arguments": {"total": open("/etc/passwd")}}',
+        '{"name": "submit", "arguments": {"total": [].__class__}}',
+    ]
+    check("code in a numeric slot never parses",
+          all(not parse_tool_call(h).ok for h in hostile))
+
+
 # -- things that MUST NOT parse ---------------------------------------------
 
 def test_empty():

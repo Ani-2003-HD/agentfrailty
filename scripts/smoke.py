@@ -21,7 +21,9 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from agentfrailty.agent import AgentConfig, calls_from_steps, run_episode  # noqa: E402
+from agentfrailty.agent import (  # noqa: E402
+    STOP_SEQUENCES, AgentConfig, calls_from_steps, run_episode,
+)
 from agentfrailty.envs.ledger import make_task  # noqa: E402
 from agentfrailty.runtimes.ollama_runtime import OllamaRuntime  # noqa: E402
 from agentfrailty.schema import EpisodeWriter, ModelSpec  # noqa: E402
@@ -51,7 +53,7 @@ def main():
     print(f"goal total: {task.goal_total}")
     print(f"model     : {a.model}   repeats={a.repeats}  temp={a.temperature}\n")
 
-    rt = OllamaRuntime(a.model)
+    rt = OllamaRuntime(a.model, stop=STOP_SEQUENCES)
     grades, rows = [], []
     try:
         rt.load()
@@ -99,7 +101,10 @@ def main():
     print("=" * 60)
     print(f"outcome correct      : {solved}/{n}")
     print(f"walked canonical     : {walked}/{n}")
+    repaired = sum(1 for r in rows for s_ in r.steps if s_.get("repaired"))
     print(f"parse failures       : {parse_fail}/{total_steps} steps")
+    print(f"arithmetic repaired  : {repaired}/{total_steps} steps"
+          "   (expression evaluated, e.g. 67 - 2 - 46 -> 19)")
     print(f"ENV ERRORS           : {env_errs}   (must be 0)")
     print(f"terminations         : "
           f"{ {t: sum(1 for r in rows if r.termination == t) for t in {r.termination for r in rows}} }")
@@ -110,12 +115,23 @@ def main():
             errs[k] = errs.get(k, 0) + v
     print(f"error types          : {errs or 'none'}")
 
+    arith = [g.arithmetic_correct_given_reads for g in grades
+             if g.arithmetic_correct_given_reads is not None]
+    print(f"arithmetic given reads: {sum(1 for x in arith if x)}/{len(arith)}"
+          "   (summed what it actually saw)")
+
     curve = step_accuracy_by_index(grades)
+    counts = {}
+    for g in grades:
+        for s_ in g.steps:
+            counts[s_.index] = counts.get(s_.index, 0) + 1
     print("\nconditional step accuracy by index "
           "(flat => independent, falling => dependence):")
     for i, v in curve.items():
-        bar = "#" * int(round(v * 40))
-        print(f"  step {i:>2}  {v:>5.2f}  {bar}")
+        bar = "#" * int(round(v * 30))
+        # Sample size per index matters: later indices are reached by few
+        # episodes, so a lone episode can read as 0.00 or 1.00 and mean nothing.
+        print(f"  step {i:>2}  {v:>5.2f}  n={counts[i]:<3} {bar}")
 
     print(f"\nraw -> {a.out}")
     if env_errs:

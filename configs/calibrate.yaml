@@ -1,0 +1,20 @@
+# Step E: difficulty calibration.
+#
+# Purpose is NOT to measure anything -- it is to find the chain lengths where
+# the models actually separate, so the full run is not spent collecting ceiling
+# or floor. Few repeats, wide ladder.
+#
+# What we are looking for:
+#   * the n where navigation stops being perfect  (it was 5/5 at n=3)
+#   * the n where arithmetic collapses            (it was 2/5 at n=3)
+# Those are probably different, which would be the headline structure.
+models:
+  - qwen2.5:1.5b-instruct
+  - qwen2.5:0.5b-instruct
+chain_lengths: [1, 2, 3, 5, 8, 12]
+task_seeds: [1, 2, 3]
+repeats: 5
+temperatures: [0.7]
+distractors: 5
+out: results/calibrate.jsonl
+cooldown_s: 0
