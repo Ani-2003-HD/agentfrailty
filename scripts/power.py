@@ -44,8 +44,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import random
-import statistics
 import sys
 from collections import defaultdict
 
@@ -54,6 +52,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from agentfrailty.agent import calls_from_steps  # noqa: E402
 from agentfrailty.envs.ledger import make_task  # noqa: E402
 from agentfrailty.scorers.trajectory import grade_episode  # noqa: E402
+from agentfrailty.stats import (  # noqa: E402
+    boot_icc, dispersion, simulate_width,
+)
 
 
 def task_for(row):
@@ -61,77 +62,6 @@ def task_for(row):
     return make_task(seed=int(parts[4][1:]), n=int(parts[1][1:]),
                      n_distractors=int(parts[2][1:]),
                      keys_per_step=int(parts[3][1:]))
-
-
-def dispersion(counts, k_each):
-    """
-    Pearson dispersion phi and the implied ICC.
-
-    counts   successes per instance
-    k_each   trials per instance
-    Returns (p_hat, phi, icc) or None when undefined (p at 0 or 1).
-    """
-    m = len(counts)
-    if m < 2:
-        return None
-    total_k = sum(k_each)
-    p = sum(counts) / total_k
-    if p <= 0 or p >= 1:
-        return None
-    chi = sum((y - k * p) ** 2 / (k * p * (1 - p))
-              for y, k in zip(counts, k_each))
-    phi = chi / (m - 1)
-    kbar = total_k / m
-    icc = (phi - 1) / (kbar - 1) if kbar > 1 else float("nan")
-    return p, phi, icc
-
-
-def boot_icc(counts, k_each, n_boot=2000, seed=0):
-    rng = random.Random(seed)
-    m = len(counts)
-    out = []
-    for _ in range(n_boot):
-        idx = [rng.randrange(m) for _ in range(m)]
-        r = dispersion([counts[i] for i in idx], [k_each[i] for i in idx])
-        if r:
-            out.append(r[2])
-    if not out:
-        return (float("nan"), float("nan"))
-    out.sort()
-    return (out[int(0.025 * len(out))], out[int(0.975 * len(out))])
-
-
-def simulate_width(icc, p, m, k, n_boot=400, seed=1):
-    """
-    Bootstrap the ICC confidence width at a hypothetical (m instances, k repeats).
-
-    Instance rates are drawn from a beta matched to (p, icc); each instance then
-    gets k Bernoulli draws. This is the power calculation: it says how much data
-    is needed before the frailty estimate is precise enough to be worth quoting.
-    """
-    rng = random.Random(seed)
-    if not (0 < p < 1) or icc <= 0:
-        return float("nan")
-    # beta with mean p and intraclass correlation icc
-    nu = (1 - icc) / icc
-    a, b = p * nu, (1 - p) * nu
-    if a <= 0 or b <= 0:
-        return float("nan")
-    widths = []
-    for _ in range(n_boot):
-        counts = []
-        for _ in range(m):
-            pi = rng.betavariate(a, b)
-            counts.append(sum(1 for _ in range(k) if rng.random() < pi))
-        r = dispersion(counts, [k] * m)
-        if r:
-            widths.append(r[2])
-    if len(widths) < 30:
-        return float("nan")
-    widths.sort()
-    lo = widths[int(0.025 * len(widths))]
-    hi = widths[int(0.975 * len(widths))]
-    return hi - lo
 
 
 def main():
