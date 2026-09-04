@@ -19,7 +19,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from agentfrailty.envs.ledger import (  # noqa: E402
-    WORDS, LedgerEnv, LedgerTask, make_task, solve,
+    WORDS, LedgerEnv, make_task, solve,
 )
 
 FAILURES = []
