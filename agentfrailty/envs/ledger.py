@@ -290,6 +290,48 @@ def remix_task(base: LedgerTask,
     )
 
 
+def relabel_task(base: LedgerTask, new_ids: list) -> LedgerTask:
+    """
+    Relabel a task with an EXPLICIT id list, preserving wiring and values.
+
+    remix_task samples replacement ids from WORDS at random, which is right for
+    measuring the SPREAD of difficulty across vocabularies. To test WHY some
+    vocabularies are hard, the words have to be chosen deliberately -- hence
+    this.
+
+    `new_ids` is ordered exactly as base.records: canonical path first, then
+    distractors. Values stay attached to positions, so the only thing that
+    changes is the labels.
+    """
+    old_ids = list(base.records.keys())
+    if len(new_ids) != len(old_ids):
+        raise ValueError(f"need {len(old_ids)} ids, got {len(new_ids)}")
+    if len(set(new_ids)) != len(new_ids):
+        raise ValueError("new_ids must be unique")
+
+    mapping = dict(zip(old_ids, new_ids))
+    records: dict[str, Record] = {}
+    for oid in old_ids:
+        rec = base.records[oid]
+        records[mapping[oid]] = Record(
+            id=mapping[oid],
+            value=rec.value,
+            next=mapping[rec.next] if rec.next is not None else None,
+        )
+    canonical = [mapping[x] for x in base.canonical_path]
+    return LedgerTask(
+        task_id=f"{base.task_id}+relabel",
+        seed=base.seed,
+        n=base.n,
+        n_distractors=base.n_distractors,
+        keys_per_step=base.keys_per_step,
+        start_id=mapping[base.start_id],
+        records=records,
+        canonical_path=canonical,
+        goal_total=base.goal_total,
+    )
+
+
 @dataclass
 class ToolResult:
     """

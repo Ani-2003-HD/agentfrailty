@@ -125,3 +125,27 @@ def pearson_r(xs, ys) -> float:
     if sxx <= 0 or syy <= 0:
         return float("nan")
     return sxy / math.sqrt(sxx * syy)
+
+
+def permutation_test(a, b, n_perm: int = 20000, seed: int = 0) -> tuple:
+    """
+    Two-sample permutation test on the difference of means.
+
+    Used to compare curated vocabulary arms. Chosen over a t-test because the
+    per-draw rates are bounded, bimodal and nowhere near normal -- which is the
+    whole point of the finding, so assuming normality to test it would be
+    self-defeating.
+
+    Returns (observed difference, two-sided p).
+    """
+    obs = sum(a) / len(a) - sum(b) / len(b)
+    pool = list(a) + list(b)
+    na = len(a)
+    rng = random.Random(seed)
+    hits = 0
+    for _ in range(n_perm):
+        rng.shuffle(pool)
+        d = sum(pool[:na]) / na - sum(pool[na:]) / (len(pool) - na)
+        if abs(d) >= abs(obs) - 1e-12:
+            hits += 1
+    return obs, (hits + 1) / (n_perm + 1)
