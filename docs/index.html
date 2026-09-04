@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Change six words and the same agent task goes from impossible to trivial</title>
+<meta name="description" content="7,560 episodes on an 8 GB MacBook Air. Agents condition on their own mistakes, and the arbitrary words a task uses decide whether they finish it at all.">
+<meta property="og:title" content="Change six words and the same agent task goes from impossible to trivial">
+<meta property="og:description" content="Corrupt an agent's own transcript, hold the length within 0.4%, and wrong-record rate goes from 0 to 24-54%. Separately: vocabulary alone carries 72% of the variance in whether a task is solvable.">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+:root{
+  --bg:#fbfbfa; --fg:#1d1c1a; --muted:#5f5c57; --rule:#e2e0dc;
+  --accent:#2a78d6; --code-bg:#f2f1ee; --table-head:#f2f1ee;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#16161a; --fg:#e8e6e3; --muted:#a09c96; --rule:#2e2e34;
+    --accent:#3987e5; --code-bg:#1f1f25; --table-head:#1f1f25;
+  }
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--fg);
+  font:17px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:44rem;margin:0 auto;padding:3.5rem 1.25rem 6rem}
+h1{font-size:2rem;line-height:1.2;letter-spacing:-.02em;margin:0 0 .6rem;font-weight:650}
+h2{font-size:1.3rem;line-height:1.3;letter-spacing:-.01em;margin:3rem 0 .9rem;font-weight:650}
+h3{font-size:1.05rem;margin:2rem 0 .6rem;font-weight:650}
+.sub{color:var(--muted);font-size:1.05rem;font-style:italic;margin:0 0 2rem}
+p{margin:0 0 1.1rem}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+hr{border:0;border-top:1px solid var(--rule);margin:2.5rem 0}
+ul{padding-left:1.2rem;margin:0 0 1.1rem}
+li{margin:.35rem 0}
+figure{margin:2rem 0}
+img{max-width:100%;height:auto;display:block;border-radius:6px}
+figcaption{color:var(--muted);font-size:.86rem;margin-top:.6rem}
+.tw{overflow-x:auto;margin:0 0 1.3rem}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{padding:.45rem .7rem;border-bottom:1px solid var(--rule);text-align:left;white-space:nowrap}
+th{background:var(--table-head);font-weight:600}
+pre{background:var(--code-bg);padding:.9rem 1rem;border-radius:6px;overflow-x:auto;font-size:.85rem;line-height:1.5;margin:0 0 1.2rem}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.88em}
+p code,li code,td code{background:var(--code-bg);padding:.1em .35em;border-radius:3px}
+blockquote{margin:1.5rem 0;padding:.2rem 0 .2rem 1.1rem;border-left:3px solid var(--accent);color:var(--muted)}
+.lede{font-size:1.1rem}
+.cta{margin:2.5rem 0;padding:1.1rem 1.2rem;border:1px solid var(--rule);border-radius:8px;background:var(--code-bg)}
+.cta p{margin:0}
+footer{margin-top:4rem;padding-top:1.5rem;border-top:1px solid var(--rule);color:var(--muted);font-size:.9rem}
+.dark-only{display:none}
+@media (prefers-color-scheme: dark){
+  .dark-only{display:block}
+  .light-only{display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Change six words and the same agent task goes from impossible to trivial</h1>
+<p class="sub">7,560 episodes on an 8 GB MacBook Air. Agents condition on their own mistakes — and which arbitrary English words a task happens to use decides whether they finish it at all.</p>
+
+<p class="lede">Two results, from the same small environment.</p>
+
+<p><strong>First:</strong> build an agent a transcript of its own past work, corrupt some fraction of it, and hold the length within 0.4%. With a clean history the model picks the wrong record <strong>zero times in 200</strong>. With a corrupted one of identical length, it does so 24% to 54% of the time — on every model size tested.</p>
+
+<p><strong>Second, and stranger:</strong> take one task instance. Keep the graph. Keep the numbers. Change only the six five-letter English words used as identifiers. Success ranges across the <strong>entire 0.00–1.00 span</strong>, and the distribution is bimodal — eleven word sets at 0.1 or below, eighteen at 0.9 or above, and not one anywhere in between 0.4 and 0.6. The vocabulary alone accounts for <strong>72%</strong> of the variance.</p>
+
+<h2>The gap</h2>
+
+<p>Agent benchmarks report a success rate. That number hides two different things.</p>
+
+<p>The first is that agents condition on their own errors. <a href="https://arxiv.org/abs/2509.09677">Sinha et al., <em>The Illusion of Diminishing Returns</em></a> (NeurIPS 2025) showed this on a synthetic arithmetic task, and their Appendix I explains why they could not do the controlled version on real agentic work:</p>
+
+<blockquote>there are multiple distinct points of failure within a single trace: an error in the retrieval step (looking up an incorrect value) or an error in the composition step (an arithmetic mistake). A controlled experiment would need to systematically manage the type, frequency, and location of these injected errors, <strong>making the setup intractable.</strong></blockquote>
+
+<p>In a tool environment with a ground-truth oracle at every step, it is tractable. This measures the frequency and location axes.</p>
+
+<p>The second is that "difficulty" may not be a property of the task at all. <a href="https://arxiv.org/abs/2603.29231">Khanal et al., <em>Beyond pass@1</em></a> attribute super-linear decay in agent success to within-run error correlation. But a gap between the mean of <code>p</code> and <code>(mean p)^T</code> is <em>also</em> exactly what task heterogeneity alone produces — Jensen's inequality — with zero within-run dependence. The words <em>heterogeneity</em>, <em>frailty</em> and <em>random effect</em> do not appear in that paper. Here the heterogeneity is measured directly, and it is enormous.</p>
+
+<h2>What I measured</h2>
+
+<p>A pointer-chase ledger. Each record holds a value and the id of the next record. The agent starts somewhere known, follows the chain, and submits the total. Four properties, each enforced by test:</p>
+
+<ul>
+<li><strong>N is required, not observed.</strong> The id of position <em>i+1</em> is learnable only by reading position <em>i</em>, so a chain of N records cannot be solved in fewer than N calls. τ²-bench and TRAJECT-Bench plot success against the number of calls an agent <em>happened</em> to make, which confounds task difficulty with chain length.</li>
+<li><strong>Inherently sequential.</strong> 2509.09677 concedes its running-sum task is associative and so parallelizable in principle. A pointer chase is not.</li>
+<li><strong>An objective oracle at every step.</strong> Exactly one call is correct at each position — what their Appendix A lacked when it looked for self-conditioning in GAIA/ALFWorld/WebShop (<em>"correctness of steps is subjective to determine on these tasks"</em>).</li>
+<li><strong>The environment never fails.</strong> Unknown ids and malformed arguments are <em>agent</em> errors returned as ordinary tool results. Environment errors: 0 across all 7,560 episodes.</li>
+</ul>
+
+<p>Every step is graded twice. <code>on_canonical</code> is absorbing — one wrong turn and everything after is off. <code>locally_correct</code> is conditional: given where the agent <em>actually</em> is, was this the right move? An agent that misreads one pointer and then follows the wrong chain flawlessly is locally correct throughout. Without that second view the two hypotheses are indistinguishable, because the absorbing view is zero after the first error by construction.</p>
+
+<h2>Finding 1: agents condition on their own mistakes</h2>
+
+<figure>
+<img class="light-only" src="figures/self-conditioning-light.png" alt="Probe accuracy falls as the injected error rate rises, for three model sizes">
+<img class="dark-only" src="figures/self-conditioning-dark.png" alt="Probe accuracy falls as the injected error rate rises, for three model sizes">
+<figcaption>5,000 probes. Context length held to 0.4% across every arm, verified on the prompts actually sent.</figcaption>
+</figure>
+
+<div class="tw"><table>
+<tr><th>injected error rate</th><th>0.5B</th><th>1.5B</th><th>3B</th></tr>
+<tr><td>0%</td><td>0.95</td><td>0.72</td><td>0.32</td></tr>
+<tr><td>25%</td><td>0.85</td><td>0.66</td><td>0.55</td></tr>
+<tr><td>50%</td><td>0.76</td><td>0.53</td><td>0.43</td></tr>
+<tr><td>75%</td><td>0.47</td><td>0.20</td><td>0.23</td></tr>
+<tr><td>100%</td><td>0.14</td><td>0.16</td><td>0.06</td></tr>
+</table></div>
+
+<p>The cleaner cut is the <strong>wrong-record rate</strong> — the agent choosing a record that isn't the one its own last observation points to:</p>
+
+<div class="tw"><table>
+<tr><th></th><th>0.5B</th><th>1.5B</th><th>3B</th></tr>
+<tr><td>healed history</td><td><strong>0.00</strong></td><td><strong>0.00</strong></td><td><strong>0.00</strong></td></tr>
+<tr><td>fully corrupted</td><td><strong>0.49</strong> (97/200)</td><td><strong>0.24</strong> (49/200)</td><td><strong>0.54</strong> (107/200)</td></tr>
+</table></div>
+
+<p>Zero in 200 on every model — then a quarter to a half, with nothing changed but whether the past steps were right.</p>
+
+<p>The obvious objection is that a model might <em>notice</em> the history went astray and jump back to the canonical path, which a conditional oracle would score as wrong. Tested: only 8–12% of wrong targets are canonical records, and 77–86% are unrelated. One probe in 200 restarted from the top.</p>
+
+<h2>Finding 2: it is a recency effect</h2>
+
+<figure>
+<img class="light-only" src="figures/recency-light.png" alt="Errors clustered late hurt far more than errors clustered early">
+<img class="dark-only" src="figures/recency-dark.png" alt="Errors clustered late hurt far more than errors clustered early">
+<figcaption>Same error rate, same history length. Only the position of the errors changes.</figcaption>
+</figure>
+
+<div class="tw"><table>
+<tr><th>rate</th><th>errors early</th><th>errors late</th></tr>
+<tr><td>0%</td><td>0.72</td><td>0.72</td></tr>
+<tr><td><strong>25%</strong></td><td><strong>0.75</strong></td><td><strong>0.48</strong></td></tr>
+<tr><td>50%</td><td>0.64</td><td>0.45</td></tr>
+<tr><td>75%</td><td>0.38</td><td>0.24</td></tr>
+<tr><td>100%</td><td>0.09</td><td>0.09</td></tr>
+</table></div>
+
+<p>At a 25% error rate, <em>where</em> the errors sit is worth <strong>27 points</strong>. Old mistakes are nearly free — early-clustered errors leave the model slightly <em>above</em> baseline. Recent ones are ruinous. The arms converge at 0% and 100%, as they must, which is a useful internal check.</p>
+
+<p>This is the location axis Appendix I called intractable. I have not found it published anywhere.</p>
+
+<h2>Finding 3: bigger models are quicker to declare victory</h2>
+
+<p>Share of probes that gave up and submitted <strong>on a perfectly healed history</strong> — at step 8 of a 14-record chain, with nothing in the transcript indicating the chain had ended:</p>
+
+<div class="tw"><table>
+<tr><th>0.5B</th><th>1.5B</th><th>3B</th></tr>
+<tr><td>5%</td><td>27.5%</td><td><strong>68%</strong></td></tr>
+</table></div>
+
+<p>That is why the 3B's baseline reads 0.32. It is not failing to navigate; it has a strong prior that it must be finished by now. Three points is a trend, not a law — this one wants a fourth model.</p>
+
+<h2>Finding 4: difficulty is lexical, and it is not subtle</h2>
+
+<figure>
+<img class="light-only" src="figures/lexical-frailty-light.png" alt="Distribution of success across 40 word sets on the same task: bimodal, spanning 0 to 1">
+<img class="dark-only" src="figures/lexical-frailty-dark.png" alt="Distribution of success across 40 word sets on the same task: bimodal, spanning 0 to 1">
+<figcaption>One task instance. Identical graph, identical numbers. Only the six identifier words change.</figcaption>
+</figure>
+
+<ul>
+<li>success spans the <strong>entire 0.00–1.00 range</strong></li>
+<li>the distribution is <strong>bimodal</strong> — 11 word sets at 0.1 or below, 18 at 0.9 or above, <strong>not one</strong> in [0.4, 0.6)</li>
+<li><strong>ICC = 0.717 [0.564, 0.839]</strong></li>
+</ul>
+
+<p>Independently, across 12 genuinely different instances at chain length 6, ICC is <strong>0.784</strong>, with per-instance rates of <code>0.00 0.07 0.07 0.60 0.93 0.93 0.93 0.93 0.93 1.00 1.00 1.00</code>. The pooled "70% at n=6" describes almost no actual instance; the mean sits in the empty middle of a bimodal distribution.</p>
+
+<p>Every failure on the impossible instances is a <strong>premature submit</strong>. Navigation is never the problem. Knowing the task isn't finished is.</p>
+
+<h2>What I ruled out</h2>
+
+<div class="tw"><table>
+<tr><th>candidate</th><th>test</th><th>result</th></tr>
+<tr><td>tokenization</td><td>prompt length across 40 word sets</td><td>flat at 353 tokens, r = 0.011</td></tr>
+<tr><td>the numbers</td><td>revalue, hold words and graph fixed</td><td>easy instances stay at 0.90–0.98</td></tr>
+<tr><td>graph structure</td><td>same words and numbers, 3 topologies</td><td>identical — 0.66 on all</td></tr>
+<tr><td>abstractness</td><td>curated abstract vs concrete pools</td><td>inconclusive, and retracted (below)</td></tr>
+</table></div>
+
+<p>Also null: letter overlap (r = 0.06), shared initials (r = 0.32, dead after multiple comparisons), repeated letters (r = −0.12), distinct letters (0.04).</p>
+
+<p><strong>What makes a word set hard is open.</strong> That is the honest state of it.</p>
+
+<h2>Three bugs worth reporting</h2>
+
+<h3>A scoring bug manufactured the effect it appeared to measure</h3>
+
+<p>The parser rejected <code>{"total": 67 - 2 - 46}</code> — which is 19, the correct answer. That parse failure then sent the model into a six-step prose spiral, degrading from the right expression to a wrong number: declining accuracy after a first error, format collapse, step-cap meltdown. A textbook self-conditioning cascade, produced <em>entirely</em> by my own scorer poisoning the context.</p>
+
+<p>Had it reached the full run it would have yielded a complete, plausible dataset supporting the thesis, undetectable from outside. It was found by reading transcripts, not by reading summary statistics.</p>
+
+<p>(2509.09677's Appendix H hit the same behaviour in Qwen3-8B — <em>"the model trying to cheat, and do the entire summation inside the <code>&lt;answer&gt;</code> tags"</em> — and counts it as an error. Here it is repaired and the repair recorded, so strict and lenient numbers stay separable.)</p>
+
+<h3>The control reintroduced the confound it existed to remove</h3>
+
+<p>The first injection implementation let wrong turns land on dead-end records, so high-error histories ran <strong>49% shorter</strong> than healed ones — which would have made long-context degradation look exactly like self-conditioning. That is the precise confound the healed-history control exists to eliminate, reintroduced by the control's own implementation. Caught by the test written for that property.</p>
+
+<h3>An experiment was irreproducible and nobody noticed</h3>
+
+<p>A curated-vocabulary experiment seeded its word draws with <code>hash(arm)</code>, which Python randomises per process. Two runs of the identical command produced opposite readings. It was found by re-running everything from a clean tree, and it had already generated a conclusion I believed and had planned to build on. The experiment is excluded from the findings above and marked inconclusive in its own source.</p>
+
+<p>An earlier interpretation was overturned the same way: calibration suggested the 0.5B "cannot follow a pointer." On a healed history it scores 0.95 — better than the 1.5B — and collapses hardest under injection. Calibration had been observing it inside its own already-derailed trajectories.</p>
+
+<h2>Measurement integrity</h2>
+
+<ul>
+<li>Every result was re-run from a <strong>clean git tree</strong>. Four of the five experiments reproduced <strong>bit-for-bit</strong>; seeds are pinned and Ollama honours them. The fifth was the <code>hash()</code> bug above.</li>
+<li>Every row carries its <strong>git commit and a dirty-tree flag</strong>. The analyzer refuses to average silently across code versions — added after an append-only file quietly accumulated rows from three parser versions.</li>
+<li><strong>Nothing derived is stored.</strong> Success is computed from final state versus goal state at analysis time, so the scorer can change without re-running inference. It did, twice.</li>
+<li>Every number in this writeup was <strong>checked against the raw data by script</strong> before publishing. Four were wrong in the first draft.</li>
+<li>One figure was <strong>retitled</strong> because its claim did not survive its own confidence intervals.</li>
+</ul>
+
+<h2>What this does not measure</h2>
+
+<ul>
+<li>One model family (Qwen2.5), three sizes, one machine.</li>
+<li>One task family. The lexical result is measured on five-letter English words in a pointer chase; whether it generalises is untested.</li>
+<li>Findings 1–3 are measured at a <strong>single probe step</strong>. Whether the effect compounds across a full episode is a separate question.</li>
+<li>The pilot uses 12 instances × 15 repeats — enough to establish that heterogeneity is large, not enough to model it.</li>
+<li>The wrong records chosen during injection are themselves a variance component: two runs at the same error rate with different targets differed by 7 points.</li>
+</ul>
+
+<h2>Why an 8 GB MacBook Air</h2>
+
+<p>Because the question needs <em>many repeats of the same task</em>, and that is the one thing paid APIs make uneconomical. Published work stops at k=3 (Beyond pass@1), k=4 (τ²-bench) or k=8 (METR). The lexical finding needed 40 word sets × 10 repeats on a single instance to become visible at all, and the injection result needed 5,000 probes. Locally, inference is free and the only cost is wall-clock.</p>
+
+<p>The constraint that forces small models is the same constraint that makes the sample size affordable.</p>
+
+<h2>Data</h2>
+
+<div class="cta">
+<p>Code, raw episodes and figures: <a href="https://github.com/Ani-2003-HD/agentfrailty">github.com/Ani-2003-HD/agentfrailty</a>. Every table here regenerates from <code>results/</code> with <code>scripts/analyze.py</code> and <code>scripts/plot.py</code>.</p>
+</div>
+
+<p>Prior work on the same machine: <a href="https://ani-2003-hd.github.io/quantcost/">quantcost</a> — what quantization actually costs in quality.</p>
+
+<footer>
+<p>Aniruddha H D · <a href="https://github.com/Ani-2003-HD">github.com/Ani-2003-HD</a> · MIT licensed</p>
+</footer>
+
+</div>
+</body>
+</html>
