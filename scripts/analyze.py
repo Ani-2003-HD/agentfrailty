@@ -128,29 +128,69 @@ def main():
                   f"{dict(terms)}")
         print()
 
-    # -- conditional step accuracy, the curve that matters -------------------
-    print("conditional step accuracy by step index")
+    # -- conditional step accuracy, STRATIFIED BY CHAIN LENGTH -----------
+    #
+    # Pooling across n is a confound, and the first calibration run showed it:
+    # step index 6 only occurs in episodes with n >= 6, so deep indices are made
+    # up entirely of longer, harder tasks. The pooled curve then conflates step
+    # POSITION with task DIFFICULTY -- which is exactly the ambiguity this whole
+    # study exists to resolve. Within a fixed n, every episode has the same task
+    # length, so a declining curve means position, not difficulty.
+    print("conditional step accuracy by step index, WITHIN each chain length")
     print("(navigation only -- a submit step is locally correct whenever the")
     print(" chain had ended, regardless of the number submitted)")
     print("flat => failures look independent; falling => dependence or frailty\n")
+
     for m in models:
         print(f"  {m}")
-        num = defaultdict(int); den = defaultdict(int)
-        for (mm, _), items in cells.items():
-            if mm != m:
-                continue
+        for n in ns:
+            items = cells.get((m, n))
+            if not items or n < 3:
+                continue          # n<3 has too few steps for a shape
+            num = defaultdict(int); den = defaultdict(int)
             for _, g, _ in items:
-                for s in g.steps:
-                    den[s.index] += 1
-                    num[s.index] += 1 if s.locally_correct else 0
-        for i in sorted(den):
-            if den[i] < 3:
-                continue          # too few episodes reach here to plot
-            v = num[i] / den[i]
-            lo, hi = wilson(num[i], den[i])
-            bar = "#" * int(round(v * 28))
-            print(f"    step {i:>2}  {v:>5.2f} [{lo:.2f},{hi:.2f}] "
-                  f"n={den[i]:<4} {bar}")
+                for st in g.steps:
+                    den[st.index] += 1
+                    num[st.index] += 1 if st.locally_correct else 0
+            shown = [i for i in sorted(den) if den[i] >= 5]
+            if len(shown) < 3:
+                continue
+            print(f"    n={n}")
+            for i in shown:
+                v = num[i] / den[i]
+                lo, hi = wilson(num[i], den[i])
+                bar = "#" * int(round(v * 24))
+                flag = ""
+                if i >= n:
+                    flag = "  <- submit//overrun"
+                print(f"      step {i:>2}  {v:>5.2f} [{lo:.2f},{hi:.2f}] "
+                      f"n={den[i]:<4} {bar}{flag}")
+        print()
+
+    # -- between-task vs within-task spread --------------------------------
+    #
+    # The calibration showed arithmetic IMPROVING from n=3 to n=5, which cannot
+    # be a chain-length effect -- it is instance heterogeneity with only a few
+    # task seeds. This table makes that visible: if per-instance rates inside
+    # one (model, n) cell differ wildly, instance identity is driving the
+    # result and the full run needs many more instances.
+    print("per-instance navigation rate within each (model, n) cell")
+    print("(wide spread => task heterogeneity dominates => need more instances)\n")
+    for m in models:
+        print(f"  {m}")
+        for n in ns:
+            items = cells.get((m, n))
+            if not items:
+                continue
+            per = defaultdict(lambda: [0, 0])
+            for r, g, _ in items:
+                per[r["task_id"]][1] += 1
+                per[r["task_id"]][0] += 1 if g.walked_canonical else 0
+            rates = sorted(k / t for k, t in per.values())
+            spread = (max(rates) - min(rates)) if rates else 0.0
+            marks = " ".join(f"{x:.2f}" for x in rates)
+            warn = "   <- heterogeneous" if spread >= 0.4 else ""
+            print(f"    n={n:<3} instances: {marks}   spread={spread:.2f}{warn}")
         print()
 
     env_errs = sum(len(r["final_state"].get("env_errors", [])) for r in rows)
