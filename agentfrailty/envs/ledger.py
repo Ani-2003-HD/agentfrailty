@@ -232,6 +232,64 @@ def make_task(
     )
 
 
+def remix_task(base: LedgerTask,
+               ids_seed: Optional[int] = None,
+               values_seed: Optional[int] = None) -> LedgerTask:
+    """
+    Produce a variant of `base` with the SAME WIRING but relabelled and/or
+    revalued. The ablation that turns "instances differ" into "here is why".
+
+    The pilot found instance-level frailty so strong it is bimodal: at n=6,
+    three instances succeeded ~0% and eight ~95%, ICC 0.784. Every failure was a
+    premature submit -- perfect navigation, then stopping one or two records
+    short, near-deterministically per instance.
+
+    Something about a specific instance decides whether the model believes it is
+    finished. Two candidates, and this function separates them:
+
+        ids_seed set, values_seed None   -> same numbers, different words
+        values_seed set, ids_seed None   -> same words, different numbers
+
+    The graph topology -- path order, which distractor points where -- is
+    preserved exactly in both cases, so the only difference is the one under
+    test. Passing neither returns a copy of the base; passing both is a fresh
+    instance and serves as the control.
+    """
+    old_ids = list(base.records.keys())      # path first, then distractors
+
+    if ids_seed is not None:
+        rng = random.Random(ids_seed)
+        new_ids = rng.sample(WORDS, len(old_ids))
+        mapping = dict(zip(old_ids, new_ids))
+    else:
+        mapping = {i: i for i in old_ids}
+
+    vrng = random.Random(values_seed) if values_seed is not None else None
+
+    records: dict[str, Record] = {}
+    for oid in old_ids:                      # fixed order => deterministic
+        rec = base.records[oid]
+        value = vrng.randint(VALUE_MIN, VALUE_MAX) if vrng else rec.value
+        records[mapping[oid]] = Record(
+            id=mapping[oid],
+            value=value,
+            next=mapping[rec.next] if rec.next is not None else None,
+        )
+
+    canonical = [mapping[x] for x in base.canonical_path]
+    return LedgerTask(
+        task_id=f"{base.task_id}+i{ids_seed}v{values_seed}",
+        seed=base.seed,
+        n=base.n,
+        n_distractors=base.n_distractors,
+        keys_per_step=base.keys_per_step,
+        start_id=mapping[base.start_id],
+        records=records,
+        canonical_path=canonical,
+        goal_total=sum(records[x].value for x in canonical),
+    )
+
+
 @dataclass
 class ToolResult:
     """
