@@ -1,0 +1,26 @@
+# Step G: the pilot.
+#
+# Narrow purpose. Not a measurement -- two questions only:
+#   1. Is there a chain length with neither ceiling nor floor, where the models
+#      actually vary?
+#   2. Can the design SEE frailty at all -- i.e. do different task instances at
+#      the same chain length have detectably different success rates?
+#
+# Question 2 is the one that decides whether the project works. Answering it
+# needs MANY REPEATS OF THE SAME INSTANCE (to pin down that instance's own rate)
+# across MANY INSTANCES (to see the spread between them). Calibration had 3
+# instances x 5 repeats, which could see neither.
+#
+# Range chosen from calibration: the 1.5B is perfect to n=5 and collapses by
+# n=8, so the interesting window is 5-8.
+#
+# 4 lengths x 12 instances x 15 repeats = 720 episodes, ~26 min.
+models:
+  - qwen2.5:1.5b-instruct
+chain_lengths: [5, 6, 7, 8]
+task_seeds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+repeats: 15
+temperatures: [0.7]
+distractors: 12
+out: results/pilot.jsonl
+cooldown_s: 0
